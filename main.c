@@ -3,7 +3,7 @@
 #include <stdbool.h>
 
 struct pv{
-    char* encoded;
+    int* encoded;
     int zlen;
     int type;
 };
@@ -141,9 +141,74 @@ void quicksort(int left, int right, int* A) {
     }
 }
 
+int** countSort(int** A, int n, int sortIndex){
+    int max = A[0][sortIndex];
+    for (int i=1; i<n; i++){
+        if (A[i][sortIndex] > max){
+            max = A[i][sortIndex];
+        }
+    }
+
+    int* count = (int*) malloc((max + 1) * sizeof(int));
+    int* cumulative = (int*) malloc((max + 1) * sizeof(int));
+    for (int i=0; i<max + 1; i++){
+        count[i] = 0;
+        cumulative[i] = 0;
+    }
+
+    for (int i=0; i<n; i++){
+        count[A[i][sortIndex]] = count[A[i][sortIndex]] + 1;
+    }
+
+    int c = 0;
+    for (int i=0; i<max + 1; i++){
+        cumulative[i] = c + count[i];
+        c = c + count[i];
+    }
+
+    int** sorted = malloc(n * sizeof(int*));
+
+    for (int i = 0; i < n; i++)
+        sorted[i] = malloc(sizeof(int) * n);
+
+    for (int i=n-1; i>-1; i--){
+        sorted[cumulative[A[i][sortIndex]] - 1] = A[i];
+        cumulative[A[i][sortIndex]]--;
+    }
+
+    return sorted;
+}
+
+int** raddixSort(int** A, int n){
+    int** sort = A;
+    for (int i=n-1; i>-1; i--){
+        sort = countSort(sort, n, i);
+    }
+    return sort;
+}
+
+
 int main() {
 
+    int** test = malloc(6 * sizeof(int*));
+    for (int i=0; i<6; i++){
+        test[i] = malloc(6 * sizeof(int));
+    }
+    test[0][0]=3;test[0][1]=4;test[0][2]=1;test[0][3]=2;test[0][4]=5;test[0][5]=1;
+    test[1][0]=4;test[1][1]=5;test[1][2]=3;test[1][3]=0;test[1][4]=2;test[1][5]=1;
+    test[2][0]=2;test[2][1]=4;test[2][2]=1;test[2][3]=5;test[2][4]=0;test[2][5]=3;
+    test[3][0]=0;test[3][1]=2;test[3][2]=1;test[3][3]=4;test[3][4]=5;test[3][5]=3;
+    test[4][0]=3;test[4][1]=0;test[4][2]=5;test[4][3]=4;test[4][4]=2;test[4][5]=1;
+    test[5][0]=1;test[5][1]=2;test[5][2]=3;test[5][3]=4;test[5][4]=0;test[5][5]=5;
 
+    test = raddixSort(test, 6);
+
+    for(int i = 0; i<6; i++){
+        for (int j = 0; j<6; j++){
+            printf("%d ",test[i][j]);
+        }
+        printf("\n");
+    }
 
     return 0;
 }
