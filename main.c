@@ -1,5 +1,12 @@
 #include <stdio.h>
 #include <stdlib.h>
+#include <stdbool.h>
+
+struct pv{
+    char* encoded;
+    int zlen;
+    int type;
+};
 
 struct node{
     char key;
@@ -52,23 +59,40 @@ int lookup(struct table *t,char key){
     return -1;
 }
 
-int* pv(char* str, int pi, int n){
+struct pv getpv(char* str, int pi, int n){
     struct table* map = createTable(pi);
     int* encoded = (int*) malloc(n * sizeof(int));
+    int zlen = 0;
+    bool zflag = false;
+
     for (int i=0; i<n; i++){
         int lastOcc = lookup(map, str[i]);
         if (lastOcc == -1){
+            if (!zflag){
+                zlen++;
+            }
             encoded[i] = 0;
             insert(map, str[i], i);
         }else{
+            if (!zflag){
+                zflag = true;
+            }
             encoded[i] = i - lastOcc;
             insert(map, str[i], i);
         }
     }
-    return encoded;
+
+    struct pv r;
+    r.encoded = encoded;
+    r.zlen = zlen;
+    if (zlen == n){r.type = 0;}
+    else{if (zlen > encoded[zlen]){r.type = 1;}
+    else{r.type = 2;}}
+
+    return r;
 }
 
-int* fw(char* str, int pi, int n){
+int* getfw(char* str, int pi, int n){
     struct table* map = createTable(pi);
     int* encoded = (int*) malloc(n * sizeof(int));
     for (int i=n-1; i>=0; i--){
@@ -118,6 +142,8 @@ void quicksort(int left, int right, int* A) {
 }
 
 int main() {
+
+
 
     return 0;
 }
