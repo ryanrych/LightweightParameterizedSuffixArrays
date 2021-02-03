@@ -5,6 +5,9 @@
 struct pv{
     int* encoded;
     int zlen;
+    int length;
+    int startingIndex;
+    int firstNonZero;
     int type;
 };
 
@@ -59,7 +62,7 @@ int lookup(struct table *t,char key){
     return -1;
 }
 
-struct pv getpv(char* str, int pi, int n){
+struct pv getpv(char* str, int pi, int n, int startingIndex){
     struct table* map = createTable(pi);
     int* encoded = (int*) malloc(n * sizeof(int));
     int zlen = 0;
@@ -83,8 +86,11 @@ struct pv getpv(char* str, int pi, int n){
     }
 
     struct pv r;
+    r.length = n;
+    r.startingIndex = startingIndex;
     r.encoded = encoded;
     r.zlen = zlen;
+    r.firstNonZero = encoded[zlen];
     if (zlen == n){r.type = 0;}
     else{if (zlen > encoded[zlen]){r.type = 1;}
     else{r.type = 2;}}
@@ -141,11 +147,11 @@ void quicksort(int left, int right, int* A) {
     }
 }
 
-int** countSort(int** A, int n, int sortIndex){
-    int max = A[0][sortIndex];
-    for (int i=1; i<n; i++){
-        if (A[i][sortIndex] > max){
-            max = A[i][sortIndex];
+struct pv* countSortByZlen(struct pv* A, int start, int n){
+    int max = A[start].zlen;
+    for (int i=start + 1; i<n; i++){
+        if (A[i].zlen > max){
+            max = A[i].zlen;
         }
     }
 
@@ -156,8 +162,47 @@ int** countSort(int** A, int n, int sortIndex){
         cumulative[i] = 0;
     }
 
-    for (int i=0; i<n; i++){
-        count[A[i][sortIndex]] = count[A[i][sortIndex]] + 1;
+    for (int i=start; i<n; i++){
+        count[A[i].zlen] = count[A[i].zlen] + 1;
+    }
+
+    int c = 0;
+    for (int i=max; i>=0; i--){
+        cumulative[i] = c + count[i];
+        c = c + count[i];
+    }
+
+    struct pv* sorted = malloc(n * sizeof(struct pv));
+
+    for (int i=0; i<start; i++){
+        sorted[i] = A[i];
+    }
+
+    for (int i=n-1; i>=start; i--){
+        sorted[cumulative[A[i].zlen] - 1 + start] = A[i];
+        cumulative[A[i].zlen]--;
+    }
+
+    return sorted;
+}
+
+struct pv* countSortByFirstNonZero(struct pv* A, int start, int n){
+    int max = A[start].firstNonZero;
+    for (int i=start + 1; i<n; i++){
+        if (A[i].firstNonZero > max){
+            max = A[i].firstNonZero;
+        }
+    }
+
+    int* count = (int*) malloc((max + 1) * sizeof(int));
+    int* cumulative = (int*) malloc((max + 1) * sizeof(int));
+    for (int i=0; i<max + 1; i++){
+        count[i] = 0;
+        cumulative[i] = 0;
+    }
+
+    for (int i=start; i<n; i++){
+        count[A[i].firstNonZero] = count[A[i].firstNonZero] + 1;
     }
 
     int c = 0;
@@ -166,47 +211,150 @@ int** countSort(int** A, int n, int sortIndex){
         c = c + count[i];
     }
 
-    int** sorted = malloc(n * sizeof(int*));
+    struct pv* sorted = malloc(n * sizeof(struct pv));
 
-    for (int i = 0; i < n; i++)
-        sorted[i] = malloc(sizeof(int) * n);
+    for (int i=0; i<start; i++){
+        sorted[i] = A[i];
+    }
 
-    for (int i=n-1; i>-1; i--){
-        sorted[cumulative[A[i][sortIndex]] - 1] = A[i];
-        cumulative[A[i][sortIndex]]--;
+    for (int i=n-1; i>=start; i--){
+        sorted[cumulative[A[i].firstNonZero] - 1 + start] = A[i];
+        cumulative[A[i].firstNonZero]--;
     }
 
     return sorted;
 }
 
-int** raddixSort(int** A, int n){
-    int** sort = A;
-    for (int i=n-1; i>-1; i--){
-        sort = countSort(sort, n, i);
+struct pv* countSortByPV(struct pv* A, int sortIndex, int n, int start, int end){
+    int max = INT_MIN;
+    for (int i = start; i < end; i++){
+        if (A[i].length > sortIndex){
+            if (A[i].encoded[sortIndex] > max){
+                max = A[i].encoded[sortIndex];
+            }
+        }
     }
-    return sort;
+
+    int* count = malloc((max + 1) * sizeof(int));
+    int* cumulative = malloc((max + 1) * sizeof(int));
+    for (int i=0; i<max + 1; i++){
+        count[i] = 0;
+        cumulative[i] = 0;
+    }
+
+    for (int i = start; i < end; i++){
+        if (A[i].length > sortIndex){
+            count[A[i].encoded[sortIndex]]++;
+        }else{
+            count[0]++;
+        }
+    }
+
+    int c = 0;
+    for (int i=0; i<max + 1; i++){
+        cumulative[i] = count[i] + c;
+        c = c + count[i];
+    }
+
+    struct pv* sorted = malloc(n * sizeof(struct pv));
+
+    for (int i=0; i<start; i++){
+        sorted[i] = A[i];
+    }
+    for (int i=end; i<n; i++){
+        sorted[i] = A[i];
+    }
+
+    for (int i=end-1; i>=start; i--){
+        if (A[i].length > sortIndex){
+            sorted[cumulative[A[i].encoded[sortIndex]] - 1 + start] = A[i];
+            cumulative[A[i].encoded[sortIndex]]--;
+        }else{
+            sorted[cumulative[0] - 1 + start] = A[i];
+            cumulative[0]--;
+        }
+    }
+
+    return sorted;
 }
 
+struct pv* raddixSort(struct pv* A, int n, int start, int end){
+    struct pv* sorted = countSortByPV(A, end - 1, n, start, end);
+    for (int i = end-2; i>=start; i--){
+        sorted = countSortByPV(sorted, i, n, start, end);
+    }
+    return sorted;
+}
+
+struct pv* sortPrevs(struct pv* A, int n){
+    struct pv* sorted = malloc(sizeof(struct pv) * n);
+
+    int startIndex = 0;
+    for(int i=0; i<n; i++){
+        if (A[i].type == 0){
+            struct pv temp = A[A[i].zlen - 1];
+            A[A[i].zlen - 1] = A[i];
+            A[i] = temp;
+            startIndex++;
+        }
+    }
+
+    A = countSortByFirstNonZero(A, startIndex, n);
+    A = countSortByZlen(A, startIndex, n);
+
+    int endIndex = n-1;
+    while (A[endIndex].type == 2){
+        endIndex--;
+    }
+
+    A = raddixSort(A, n, startIndex, endIndex + 1);
+
+    return A;
+
+}
+
+//fix this
+char* substring(char* s, int start, int end){
+    char* r = malloc((end - start) * sizeof(char));
+    for(int i=start; i<end; i++){
+        r[i - start] = s[i];
+    }
+    return r;
+}
 
 int main() {
 
-    int** test = malloc(6 * sizeof(int*));
-    for (int i=0; i<6; i++){
-        test[i] = malloc(6 * sizeof(int));
+    char* s = "babbcacaabcb";
+    int n = 12;
+
+    char** suffixes = malloc(n * sizeof(char*));
+
+    suffixes[0] = "babbcacaabcb";
+    suffixes[1] = "abbcacaabcb";
+    suffixes[2] = "bbcacaabcb";
+    suffixes[3] = "bcacaabcb";
+    suffixes[4] = "cacaabcb";
+    suffixes[5] = "acaabcb";
+    suffixes[6] = "caabcb";
+    suffixes[7] = "aabcb";
+    suffixes[8] = "abcb";
+    suffixes[9] = "bcb";
+    suffixes[10] = "cb";
+    suffixes[11] = "b";
+
+    struct pv* pvs = malloc(n * sizeof(struct pv));
+
+    for (int i=0; i<n; i++){
+        pvs[i] = getpv(suffixes[i], 4, n - i, i);
     }
-    test[0][0]=3;test[0][1]=4;test[0][2]=1;test[0][3]=2;test[0][4]=5;test[0][5]=1;
-    test[1][0]=4;test[1][1]=5;test[1][2]=3;test[1][3]=0;test[1][4]=2;test[1][5]=1;
-    test[2][0]=2;test[2][1]=4;test[2][2]=1;test[2][3]=5;test[2][4]=0;test[2][5]=3;
-    test[3][0]=0;test[3][1]=2;test[3][2]=1;test[3][3]=4;test[3][4]=5;test[3][5]=3;
-    test[4][0]=3;test[4][1]=0;test[4][2]=5;test[4][3]=4;test[4][4]=2;test[4][5]=1;
-    test[5][0]=1;test[5][1]=2;test[5][2]=3;test[5][3]=4;test[5][4]=0;test[5][5]=5;
 
-    test = raddixSort(test, 6);
+    struct pv* test = sortPrevs(pvs, 12);
 
-    for(int i = 0; i<6; i++){
-        for (int j = 0; j<6; j++){
-            printf("%d ",test[i][j]);
+    for (int i=0; i<n; i++){
+        for (int j = 0; j<test[i].length; j++){
+            printf("%d ",test[i].encoded[j]);
         }
+        printf("  %d",test[i].type);
         printf("\n");
     }
 
